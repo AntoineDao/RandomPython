@@ -1,0 +1,171 @@
+from openpyxl import load_workbook
+import sys, os
+
+Directory = os.path.dirname(sys.argv[0])
+Gsasfilename = 'GSASSS.xlsx'
+Gsasfilepath = os.path.join(Directory,Gsasfilename)
+print (Gsasfilepath)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Get information from Excel Sheet in this section
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+wb = load_workbook(filename = Gsasfilepath, read_only ='True')
+
+Sheet_risks = wb['Risks 11-11-16']
+Sheet_current_target = wb['Current Target']
+
+def get_column(sheet,col,rmin,rmax,key):
+	append_list = []
+	Range = col + str(rmin) +':'+ col +str(rmax)
+	for row in sheet.iter_rows(Range):
+		for cell in row:
+			append_list.append(cell.value)
+	Outputs[key] = append_list
+
+Outputs = {}
+
+#Objective is to get dictionary with the following info per credit
+#GSAS credit
+get_column(Sheet_risks,'C',10,61,'GsasCredit')
+get_column(Sheet_risks,'E',10,61,'GsasCreditName')
+#Target Score
+get_column(Sheet_risks,'T',10,61,'TargetScore')
+#Scores
+get_column(Sheet_current_target,'BI',7,58,'Requirement')
+get_column(Sheet_current_target,'BJ',7,58,'-1')
+get_column(Sheet_current_target,'BK',7,58,'0')
+get_column(Sheet_current_target,'BL',7,58,'1')
+get_column(Sheet_current_target,'BM',7,58,'2')
+get_column(Sheet_current_target,'BN',7,58,'3')
+#Short Description of how to meet it
+get_column(Sheet_current_target,'BG',7,58,'Description')
+#Traffic light risk + explanation
+get_column(Sheet_risks,'AO',10,61,'TLDesign')
+get_column(Sheet_risks,'AQ',10,61,'TLCost')
+get_column(Sheet_risks,'AS',10,61,'TLProg')
+get_column(Sheet_risks,'AU',10,61,'TLExpl')
+#Actions ==> Boolean operation as per chat with Emily
+#Check if contractor
+get_column(Sheet_current_target,'AE',7,58,'Contractor')
+#Check if calc
+get_column(Sheet_current_target,'Y',7,58,'Calc')
+
+Actions = []
+print(Outputs.get('3'))
+for cont, calc in zip(Outputs['Contractor'],Outputs['Calc']):
+	if cont == 'Contractor':
+		Actions.append('Await information from lead contractor.')
+	else:
+		if calc == 'None':
+			Actions.append('Check, update and refine calculations.')
+		else:
+			Actions.append('Carry out a first pass of calculations according to tender design and VE proposal. Then carry out a second pass using tender design, VE proposal and Attachment 7.')
+
+Outputs['Actions'] = Actions
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Output information to Word Document
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+from docx import Document
+
+GSAS_report = Document('GSAS Report formatted.docx')
+
+
+def createpage(i):
+	#Title
+	GSAS_report.add_heading(str(Outputs.get('GsasCredit')[i]) +': ' + str(Outputs.get('GsasCreditName')[i]),1)
+	
+	
+	#Explanation of credit
+	GSAS_report.add_heading('Credit Description',2)
+	GSAS_report.add_paragraph('Currently, the targeted score for this credit is '+ str(Outputs.get('TargetScore')[i]) +'.'+' In order to achieve the maximum score of 3 it is necessary to '+ str(Outputs.get('Description')[i])+'. Table ' + str(i+1) + '-1 below shows the requirements to achieve each score for this credit:')
+	GSAS_report.add_paragraph('')
+
+	#Score table
+	table1 = GSAS_report.add_table(6,2)
+	col1 = table1.columns[0].cells
+	col1[0].text = "Score"
+	col1[1].text = '-1'
+	col1[2].text = '0'
+	col1[3].text = '1'
+	col1[4].text = '2'
+	col1[5].text = '3'
+
+	col2 = table1.columns[1].cells
+	col2[0].text = str(Outputs.get('Requirement')[i])
+	col2[1].text = str(Outputs.get('-1')[i])
+	col2[2].text = str(Outputs.get('0')[i])
+	col2[3].text = str(Outputs.get('1')[i])
+	col2[4].text = str(Outputs.get('2')[i])
+	col2[5].text = str(Outputs.get('3')[i])
+
+	table1.style = 'Buro Happold Table1'
+
+	#Current strategy
+	GSAS_report.add_heading('Current Strategy',2)
+	GSAS_report.add_paragraph('The current strategy adopted for this credit is ADD MORE DETAIL ABOUT STRATEGY HERE')
+	GSAS_report.add_paragraph('Figure ' + str(i+1) + '-1 below illustrates this strategy')
+
+	GSAS_report.add_picture('image.png')
+
+	#Risks
+	#GSAS_report.add_heading('',2)
+	if Outputs.get('TargetScore')[i] != 3:
+		GSAS_report.add_paragraph('The current proposal does not achieve a score of 3 on this credit for the following reason:')
+	else:
+		GSAS_report.add_paragraph('The main comments concerning this credit are as follows:')
+
+	if Outputs.get('TLExpl')[i] != 'None.':
+		GSAS_report.add_paragraph(str(Outputs.get('TLExpl')[i]))
+
+	GSAS_report.add_paragraph('The design, cost and programme risks associated with achieving ' +str(Outputs.get('TargetScore')[i]) + ' points for the ' + str(Outputs.get('GsasCreditName')[i]) + ' credit are resumed in Table ' +str(i+1)+ '-2 below:')
+	GSAS_report.add_paragraph('')
+	#Risks table generation
+	table2 = GSAS_report.add_table(2,3)
+	heading_cells = table2.rows[0].cells 
+	heading_cells[0].text = 'Design'
+	heading_cells[1].text = 'Cost'
+	heading_cells[2].text = 'Programme'
+	risk_cells = table2.rows[1].cells
+	risk_cells[0].text =  str(Outputs.get('TLDesign')[i])
+	risk_cells[1].text = str(Outputs.get('TLCost')[i])
+	risk_cells[2].text = str(Outputs.get('TLProg')[i])
+	table2.style = 'Buro Happold Table1'
+	#Risks description
+	#if Outputs.get('TLExpl')[i] != 'None.':
+	#	GSAS_report.add_paragraph(str(Outputs.get('TLExpl')[i]))
+	GSAS_report.add_page_break()
+
+	'''
+	#Actions
+	GSAS_report.add_heading('Required Actions',2)
+
+	cont = str(Outputs.get('Contractor')[i])
+	calc = str(Outputs.get('Calc')[i])
+	sought = str(Outputs.get('Description')[i])
+
+	if sought != "This score is not being targetted.":
+		if cont != 'Contractor':
+			if calc != 'None':
+				paragraph = ''
+			else:
+				paragraph = ''
+		else:
+			paragraph = 'NO INFORMATION CAN BE ADDED HERE AS WAITING FOR CONTRACTOR INPUT.'
+	else:
+		paragraph = 'No further action is required because ' + sought.lower()
+
+	GSAS_report.add_paragraph(paragraph)
+
+	GSAS_report.add_page_break()
+	'''
+i = 0
+
+while i< len(Outputs.get('GsasCredit')):
+	createpage(i)
+	i += 1
+
+GSAS_report.save('GSAS Report.docx')
+
+
