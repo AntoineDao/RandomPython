@@ -1,0 +1,30 @@
+# -*- coding: utf-8 -*-
+"""
+Spyder Editor
+
+This is a temporary script file.
+"""
+import os
+#from openpyxl import Workbook
+from openpyxl import load_workbook
+
+
+#Get file path to excel sheet
+path = 'C:\\Users\\adao\\Desktop\\Python_tests'
+
+os.chdir(path)
+
+#Open excel sheet
+wb = load_workbook('Twitterdump.xlsx', data_only=True)
+
+ws1 = wb['Sheet1']
+
+#Assess list length
+i = ws1['B1'].value
+
+List = ['stuff', 'things','and', 'others']
+
+for item in List:
+    ws1.append({'A' : item})
+
+wb.save('Twitterdump.xlsx')
